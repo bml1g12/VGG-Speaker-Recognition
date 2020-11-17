@@ -10,9 +10,50 @@ import librosa
 from scipy import signal
 
 
-def load_wav(vid_path, sr, mode='train'):
-    wav, sr_ret = librosa.load(vid_path, sr=sr)
+# ===============================================
+#       code from Arsha for loading data.
+# ===============================================
+def read_audio(current_file, sample_rate=None, mono=True):
+    """Read audio file
+    Parameters
+    ----------
+    current_file : str
+    sample_rate: int, optional
+        Target sampling rate. Defaults to using native sampling rate.
+    mono : int, optional
+        Convert multi-channel to mono. Defaults to True.
+    Returns
+    -------
+    y : (n_samples, n_channels) np.array
+        Audio samples.
+    sample_rate : int
+        Sampling rate.
+    Notes
+    -----
+    """
 
+    y, file_sample_rate = sf.read(
+        current_file, dtype="float32", always_2d=True
+    )
+
+    # convert to mono
+    if mono and y.shape[1] > 1:
+        y = np.mean(y, axis=1, keepdims=True)
+
+    # resample if sample rates mismatch
+    if (sample_rate is not None) and (file_sample_rate != sample_rate):
+        if y.shape[1] == 1:
+            # librosa expects mono audio to be of shape (n,), but we have (n, 1).
+            y = librosa.core.resample(y[:, 0], file_sample_rate, sample_rate)[:, None]
+        else:
+            y = librosa.core.resample(y.T, file_sample_rate, sample_rate).T
+    else:
+        sample_rate = file_sample_rate
+
+    return y, sample_rate
+
+def load_wav(vid_path, sr, mode='train'):
+    wav, sr_ret = librosa.load(vid_path, sr=sr) #
     if mode == 'train':
         extended_wav = np.append(wav, wav)
         if np.random.random() < 0.3:
