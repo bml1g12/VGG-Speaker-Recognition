@@ -6,27 +6,57 @@ import scipy
 import soundfile as sf
 import scipy.signal as sps
 from scipy import interpolate
+import librosa
+from scipy import signal
+
+
 # ===============================================
 #       code from Arsha for loading data.
 # ===============================================
+def read_audio(current_file, sample_rate=None, mono=True):
+    """Read audio file
+    Parameters
+    ----------
+    current_file : str
+    sample_rate: int, optional
+        Target sampling rate. Defaults to using native sampling rate.
+    mono : int, optional
+        Convert multi-channel to mono. Defaults to True.
+    Returns
+    -------
+    y : (n_samples, n_channels) np.array
+        Audio samples.
+    sample_rate : int
+        Sampling rate.
+    Notes
+    -----
+    """
+
+    y, file_sample_rate = sf.read(
+        current_file, dtype="float32", always_2d=True
+    )
+
+    # convert to mono
+    if mono and y.shape[1] > 1:
+        y = np.mean(y, axis=1, keepdims=True)
+
+    # resample if sample rates mismatch
+    if (sample_rate is not None) and (file_sample_rate != sample_rate):
+        if y.shape[1] == 1:
+            # librosa expects mono audio to be of shape (n,), but we have (n, 1).
+            y = librosa.core.resample(y[:, 0], file_sample_rate, sample_rate)[:, None]
+        else:
+            y = librosa.core.resample(y.T, file_sample_rate, sample_rate).T
+    else:
+        sample_rate = file_sample_rate
+
+    return y, sample_rate
+
 def load_wav(vid_path, sr, mode='train'):
 
-    #t1=timelib.time()
-    #print("start loading wav")
-    #print(sr)
-    #wav, sr_ret = librosa.load(vid_path, sr=sr)
-    #sr_ret, wav = scipy.io.wavfile.read(vid_path)
-
-    wav, sr_ret = sf.read(vid_path)
-    #sr_ret, old_audio = scipy.io.wavfile.read(vid_path)
-    #if sr_ret != sr:
-    #    new_rate = sr
-    #    number_of_samples = round(len(old_audio) * float(new_rate) / sr_ret)
-    #    wav = sps.resample(old_audio, number_of_samples)
-
-
-    #assert sr_ret == 16000, "we need same samplerate as librosa originally provided but is: " +str(sr_ret)
-    #print("finish loading wav", timelib.time()-t1)
+    wav, sr_ret = read_audio(vid_path, sample_rate=sr, mono=True)
+    
+    print("finish loading wav", timelib.time()-t1)
     if mode == 'train':
         extended_wav = np.append(wav, wav)
         if np.random.random() < 0.3:
@@ -43,8 +73,6 @@ def lin_spectogram_from_wav(wav, hop_length, win_length, n_fft=1024):
 
 
 def load_data(path, win_length=400, sr=16000, hop_length=160, n_fft=512, spec_len=250, mode='train'):
-    #print("starting loading a datum")
-    #t1 = timelib.time()
     wav = load_wav(path, sr=sr, mode=mode)
     linear_spect = lin_spectogram_from_wav(wav, hop_length, win_length, n_fft)
     mag, _ = librosa.magphase(linear_spect)  # magnitude
@@ -61,7 +89,6 @@ def load_data(path, win_length=400, sr=16000, hop_length=160, n_fft=512, spec_le
     # preprocessing, subtract mean, divided by time-wise var
     mu = np.mean(spec_mag, 0, keepdims=True)
     std = np.std(spec_mag, 0, keepdims=True)
-    #print("finished loading a datum", timelib.time() - t1)
     return (spec_mag - mu) / (std + 1e-5)
 
 

@@ -5,6 +5,7 @@ import sys
 import keras
 import numpy as np
 
+np.seterr(all='raise')
 sys.path.append('../tool')
 import toolkits
 
@@ -35,8 +36,7 @@ parser.add_argument('--ohem_level', default=0, type=int,
                     help='pick hard samples from (ohem_level * batch_size) proposals, must be > 1')
 global args
 args = parser.parse_args()
-import numpy as np
-np.seterr(all='raise')
+
 def main():
 
     # gpu configuration
@@ -76,8 +76,6 @@ def main():
                                            mode='train', args=args)
     # ==> load pre-trained model ???
     mgpu = len(keras.backend.tensorflow_backend._get_available_gpus())
-    #import pdb
-    #pdb.set_trace()
 
     print("mpu", mgpu)
     if args.resume:
@@ -85,9 +83,9 @@ def main():
         if args.resume:
             if os.path.isfile(args.resume):
                 if mgpu == 1:
-                    # by_name=True, skip_mismatch=True
                     # https://github.com/WeidiXie/VGG-Speaker-Recognition/issues/46
-                    network.load_weights(os.path.join(args.resume), by_name=True, skip_mismatch=True)
+                    network.load_weights(os.path.join(args.resume), by_name=True,
+                                         skip_mismatch=True)
                 else:
                     print("loading N+1", mgpu)
                     network.layers[mgpu + 1].load_weights(os.path.join(args.resume))
